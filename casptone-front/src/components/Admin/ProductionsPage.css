@@ -1,0 +1,94 @@
+.productions-container {
+    max-width: 800px;
+    margin: auto;
+    padding: 30px;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  
+  h2 {
+    text-align: center;
+    margin-bottom: 40px;
+    
+  }
+  
+  .timeline {
+    position: relative;
+    padding-left: 30px;
+    border-left: 4px solid #3498db;
+  }
+  
+  .timeline-item {
+    margin-bottom: 30px;
+    position: relative;
+  }
+  
+  .timeline-dot {
+    width: 16px;
+    height: 16px;
+    background-color: #3498db;
+    border-radius: 50%;
+    position: absolute;
+    left: -10px;
+    top: 5px;
+  }
+  
+  .timeline-content {
+    background: #f9f9f9;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+  
+  .timeline-content h3 {
+    margin-top: 5px;
+    margin-bottom: 8px;
+    color: #2c3e50;
+  }
+  
+  .date {
+    color: #999;
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  
+  .stage {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    color: white;
+  }
+  
+  .stage-preparation {
+    background-color: #f39c12;
+  }
+  
+  .stage-assembly {
+    background-color: #2980b9;
+  }
+  
+  .stage-finishing {
+    background-color: #8e44ad;
+  }
+  
+  .stage-quality-control {
+    background-color: #27ae60;
+  }
+  
+  .status {
+    margin-top: 10px;
+    font-weight: bold;
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  
+  .status-in-progress {
+    background-color: #f1c40f;
+    color: #fff;
+  }
+  
+  .status-completed {
+    background-color: #2ecc71;
+    color: #fff;
+  }
+  
