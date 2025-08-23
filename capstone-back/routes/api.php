@@ -53,6 +53,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //Production Routes
     
     Route::get('/productions', [ProductionController::class, 'index']);
+    Route::get('/productions/analytics', [ProductionController::class, 'analytics']);
     Route::post('/productions', [ProductionController::class, 'store']);
     Route::get('/productions/{id}', [ProductionController::class, 'show']);
     Route::patch('/productions/{id}', [ProductionController::class, 'update']);

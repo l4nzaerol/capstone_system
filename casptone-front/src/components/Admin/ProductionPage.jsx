@@ -11,6 +11,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import axios from "axios";
+import Pusher from "pusher-js";
 
 // Simple CSV export helper
 const toCSV = (rows, columns) => {
@@ -22,68 +24,6 @@ const toCSV = (rows, columns) => {
 const STAGES = ["Preparation", "Assembly", "Finishing", "Quality Control"];
 const COLORS = ["#f39c12", "#2980b9", "#8e44ad", "#27ae60"];
 
-// Mock API functions for demonstration
-const mockAPI = {
-  productions: [
-    {
-      id: 1,
-      product_name: "Widget A",
-      date: "2025-08-20",
-      stage: "Assembly",
-      status: "In Progress",
-      quantity: 50,
-      resources_used: { materials: "Steel", workers: 3 },
-      notes: "On schedule"
-    },
-    {
-      id: 2,
-      product_name: "Widget B",
-      date: "2025-08-19",
-      stage: "Quality Control",
-      status: "Completed",
-      quantity: 75,
-      resources_used: { materials: "Aluminum", workers: 2 },
-      notes: "Quality approved"
-    },
-    {
-      id: 3,
-      product_name: "Gadget X",
-      date: "2025-08-21",
-      stage: "Preparation",
-      status: "Pending",
-      quantity: 100,
-      resources_used: { materials: "Plastic", workers: 4 },
-      notes: "Waiting for materials"
-    },
-    {
-      id: 4,
-      product_name: "Component Z",
-      date: "2025-08-18",
-      stage: "Finishing",
-      status: "Hold",
-      quantity: 25,
-      resources_used: { materials: "Composite", workers: 1 },
-      notes: "Equipment maintenance required"
-    }
-  ],
-
-  async getProductions() {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return this.productions;
-  },
-
-  async updateProduction(id, updates) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const index = this.productions.findIndex(p => p.id === id);
-    if (index !== -1) {
-      this.productions[index] = { ...this.productions[index], ...updates };
-      return this.productions[index];
-    }
-    throw new Error('Production not found');
-  }
-};
-
 export default function ProductionTrackingSystem() {
   const [productions, setProductions] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -93,66 +33,107 @@ export default function ProductionTrackingSystem() {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    product_name: "",
+    date: "",
+    stage: STAGES[0],
+    status: "Pending",
+    quantity: 0,
+    materials: "",
+    workers: 0,
+    notes: "",
+  });
+
+  const API_BASE = "http://localhost:8000/api";
+
+  const authHeaders = () => {
+    const token = localStorage.getItem("token");
+    return { Authorization: `Bearer ${token}` };
+  };
 
   useEffect(() => {
     fetchProductions();
+    // Real-time via Pusher (ensure keys are configured in backend broadcasting.php and .env)
+    try {
+      const pusherKey = import.meta?.env?.VITE_PUSHER_KEY || process.env.REACT_APP_PUSHER_KEY || "";
+      const pusherCluster = import.meta?.env?.VITE_PUSHER_APP_CLUSTER || process.env.REACT_APP_PUSHER_CLUSTER || "mt1";
+      if (pusherKey) {
+        const pusher = new Pusher(pusherKey, { cluster: pusherCluster });
+        const channel = pusher.subscribe("production-channel");
+        channel.bind("production-updated", () => {
+          fetchProductions(false);
+        });
+      }
+    } catch (e) {
+      // ignore if not configured
+    }
+    // Polling fallback every 30s
+    const id = setInterval(() => fetchProductions(false), 30000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
     applyFilters();
   }, [productions, search, statusFilter, dateRange]);
 
-  const fetchProductions = async () => {
-    setLoading(true);
+  const fetchProductions = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     setError("");
     try {
-      // Replace this with your actual API call
-      const data = await mockAPI.getProductions();
-      console.log('Fetched productions:', data); // Debug log
-      setProductions(data);
-      setFiltered(data);
+      const params = {};
+      if (statusFilter !== "all") params.status = statusFilter;
+      if (dateRange.start && dateRange.end) {
+        params.start_date = dateRange.start;
+        params.end_date = dateRange.end;
+      }
+      const res = await axios.get(`${API_BASE}/productions`, {
+        params,
+        headers: authHeaders(),
+      });
+      setProductions(res.data || []);
+      setFiltered(res.data || []);
     } catch (err) {
       console.error("Fetch error:", err);
-      setError("Failed to load production data. Please check your API endpoint and authentication.");
+      setError("Failed to load production data. Please check your API and authentication.");
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
   const applyFilters = () => {
     let data = [...productions];
-    
+
     if (search.trim()) {
       const q = search.toLowerCase();
       data = data.filter((p) =>
-        (p.product_name || "").toLowerCase().includes(q) || 
-        (p.id && String(p.id).includes(q)) || 
+        (p.product_name || "").toLowerCase().includes(q) ||
+        (p.id && String(p.id).includes(q)) ||
         (p.date || "").includes(q)
       );
     }
-    
+
     if (statusFilter !== "all") {
       data = data.filter((p) => p.status === statusFilter);
     }
-    
+
     if (dateRange.start) {
       data = data.filter((p) => new Date(p.date) >= new Date(dateRange.start));
     }
-    
+
     if (dateRange.end) {
       data = data.filter((p) => new Date(p.date) <= new Date(dateRange.end));
     }
-    
-    console.log('Filtered data:', data); // Debug log
+
     setFiltered(data);
   };
 
   // Derived data for charts
-  const stageData = useMemo(() => 
+  const stageData = useMemo(() =>
     STAGES.map((stage) => ({
       name: stage,
-      value: productions.filter((p) => p.stage === stage).length
-    })), [productions]);
+      value: productions.filter((p) => p.stage === stage).length,
+    })), [productions]
+  );
 
   const dailyOutput = useMemo(() => {
     const map = {};
@@ -175,17 +156,8 @@ export default function ProductionTrackingSystem() {
       const queue = byStage[s] || [];
       const cap = capacities[s] || 1;
       queue.sort((a, b) => new Date(a.date) - new Date(b.date) || b.quantity - a.quantity);
-      const assign = queue.slice(0, cap).map((q) => ({ 
-        id: q.id, 
-        product_name: q.product_name, 
-        quantity: q.quantity 
-      }));
-      alloc.push({ 
-        stage: s, 
-        capacity: cap, 
-        assigned: assign, 
-        queued: Math.max(0, queue.length - assign.length) 
-      });
+      const assign = queue.slice(0, cap).map((q) => ({ id: q.id, product_name: q.product_name, quantity: q.quantity }));
+      alloc.push({ stage: s, capacity: cap, assigned: assign, queued: Math.max(0, queue.length - assign.length) });
     });
 
     setSuggestions(alloc);
@@ -199,11 +171,36 @@ export default function ProductionTrackingSystem() {
 
   const updateStage = async (id, newStage) => {
     try {
-      const updated = await mockAPI.updateProduction(id, { stage: newStage });
+      const res = await axios.patch(`${API_BASE}/productions/${id}`, { stage: newStage }, { headers: authHeaders() });
+      const updated = res.data;
       setProductions((prev) => prev.map((p) => (p.id === id ? updated : p)));
     } catch (err) {
       console.error("Update stage error:", err);
       setError("Failed to update production stage");
+    }
+  };
+
+  const createProduction = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        product_name: form.product_name,
+        date: form.date,
+        stage: form.stage,
+        status: form.status,
+        quantity: Number(form.quantity) || 0,
+        resources_used: {
+          materials: form.materials,
+          workers: Number(form.workers) || 0,
+        },
+        notes: form.notes || null,
+      };
+      const res = await axios.post(`${API_BASE}/productions`, payload, { headers: authHeaders() });
+      setProductions((prev) => [res.data, ...prev]);
+      setForm({ product_name: "", date: "", stage: STAGES[0], status: "Pending", quantity: 0, materials: "", workers: 0, notes: "" });
+    } catch (err) {
+      console.error("Create error:", err);
+      setError("Failed to create production record");
     }
   };
 
@@ -231,7 +228,6 @@ export default function ProductionTrackingSystem() {
     const content = filtered.map(r => 
       `ID: ${r.id}, Product: ${r.product_name}, Date: ${r.date}, Stage: ${r.stage}, Status: ${r.status}, Quantity: ${r.quantity}`
     ).join('\n');
-    
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -255,6 +251,57 @@ export default function ProductionTrackingSystem() {
           <button className="btn btn-outline-secondary" onClick={bulkExportPDF}>
             Export Report
           </button>
+        </div>
+      </div>
+
+      {/* Create Production */}
+      <div className="card mb-4 shadow-sm">
+        <div className="card-body">
+          <h5 className="card-title text-primary">Record Daily Output</h5>
+          <form className="row g-3" onSubmit={createProduction}>
+            <div className="col-md-3">
+              <label className="form-label">Product</label>
+              <input className="form-control" value={form.product_name} onChange={(e) => setForm({ ...form, product_name: e.target.value })} required />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">Date</label>
+              <input type="date" className="form-control" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">Stage</label>
+              <select className="form-select" value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })}>
+                {STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">Status</label>
+              <select className="form-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <option>Pending</option>
+                <option>In Progress</option>
+                <option>Completed</option>
+                <option>Hold</option>
+              </select>
+            </div>
+            <div className="col-md-1">
+              <label className="form-label">Qty</label>
+              <input type="number" min="0" className="form-control" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">Materials</label>
+              <input className="form-control" value={form.materials} onChange={(e) => setForm({ ...form, materials: e.target.value })} />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">Workers</label>
+              <input type="number" min="0" className="form-control" value={form.workers} onChange={(e) => setForm({ ...form, workers: e.target.value })} />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label">Notes</label>
+              <input className="form-control" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </div>
+            <div className="col-12 d-flex justify-content-end">
+              <button className="btn btn-primary" type="submit">Add Record</button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -318,6 +365,7 @@ export default function ProductionTrackingSystem() {
                   setSearch(""); 
                   setStatusFilter("all"); 
                   setDateRange({ start: "", end: "" }); 
+                  fetchProductions();
                 }}
               >
                 Reset
@@ -350,7 +398,7 @@ export default function ProductionTrackingSystem() {
                 <div className="text-center py-4 text-muted">
                   <i className="fas fa-inbox fa-3x mb-3"></i>
                   <div>No production items match the current filters.</div>
-                  <button className="btn btn-outline-primary mt-2" onClick={fetchProductions}>
+                  <button className="btn btn-outline-primary mt-2" onClick={() => fetchProductions()}>
                     Refresh Data
                   </button>
                 </div>
