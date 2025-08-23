@@ -103,7 +103,7 @@ const OrderTable = () => {
                     </p>
                     <p>
                       <FaTruck className="me-2" />
-                      Estimated Delivery: {order.delivery_date || "TBA"}
+                      Estimated Delivery: {order.delivery_date || new Date(new Date(order.created_at).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString()}
                     </p>
                   </div>
                 </Card.Body>

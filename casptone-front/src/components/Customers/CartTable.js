@@ -54,6 +54,37 @@ const CartTable = () => {
     }
   };
 
+  const createProductionsForOrder = async (orderResponse) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const headers = { Authorization: `Bearer ${token}` };
+      const orderId = orderResponse?.data?.order?.id || orderResponse?.data?.id || null;
+      const today = new Date().toISOString().slice(0, 10);
+      const stageStart = "Design";
+      const payloads = cartItems.map((item) => ({
+        product_name: item.product?.name || item.name || "Product",
+        date: today,
+        stage: stageStart,
+        status: "Pending",
+        quantity: item.quantity || 0,
+        resources_used: {
+          materials: item.product?.materials || "",
+          workers: 0,
+        },
+        notes: orderId ? `From order #${orderId}` : "From checkout",
+      }));
+      await Promise.all(
+        payloads.map((payload) =>
+          axios.post("http://localhost:8000/api/productions", payload, { headers })
+        )
+      );
+    } catch (e) {
+      console.error("Failed to create production records:", e);
+      alert("Checkout succeeded, but failed to create production records.");
+    }
+  };
+
   const handleCheckout = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -63,8 +94,10 @@ const CartTable = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      await createProductionsForOrder(response);
+
       alert("Order placed successfully!");
-      setCartItems([]); // clear cart after checkout
+      setCartItems([]);
     } catch (err) {
       alert("Checkout failed.");
     }

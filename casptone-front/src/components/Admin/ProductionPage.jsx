@@ -11,6 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import axios from "axios";
 
 // Simple CSV export helper
 const toCSV = (rows, columns) => {
@@ -19,69 +20,13 @@ const toCSV = (rows, columns) => {
   return [header, ...lines].join("\n");
 };
 
-const STAGES = ["Preparation", "Assembly", "Finishing", "Quality Control"];
+const STAGES = ["Design", "Preparation", "Cutting", "Assembly", "Finishing", "Quality Control"];
 const COLORS = ["#f39c12", "#2980b9", "#8e44ad", "#27ae60"];
 
-// Mock API functions for demonstration
-const mockAPI = {
-  productions: [
-    {
-      id: 1,
-      product_name: "Widget A",
-      date: "2025-08-20",
-      stage: "Assembly",
-      status: "In Progress",
-      quantity: 50,
-      resources_used: { materials: "Steel", workers: 3 },
-      notes: "On schedule"
-    },
-    {
-      id: 2,
-      product_name: "Widget B",
-      date: "2025-08-19",
-      stage: "Quality Control",
-      status: "Completed",
-      quantity: 75,
-      resources_used: { materials: "Aluminum", workers: 2 },
-      notes: "Quality approved"
-    },
-    {
-      id: 3,
-      product_name: "Gadget X",
-      date: "2025-08-21",
-      stage: "Preparation",
-      status: "Pending",
-      quantity: 100,
-      resources_used: { materials: "Plastic", workers: 4 },
-      notes: "Waiting for materials"
-    },
-    {
-      id: 4,
-      product_name: "Component Z",
-      date: "2025-08-18",
-      stage: "Finishing",
-      status: "Hold",
-      quantity: 25,
-      resources_used: { materials: "Composite", workers: 1 },
-      notes: "Equipment maintenance required"
-    }
-  ],
-
-  async getProductions() {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return this.productions;
-  },
-
-  async updateProduction(id, updates) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const index = this.productions.findIndex(p => p.id === id);
-    if (index !== -1) {
-      this.productions[index] = { ...this.productions[index], ...updates };
-      return this.productions[index];
-    }
-    throw new Error('Production not found');
-  }
+const API_BASE = "http://localhost:8000/api";
+const authHeaders = () => {
+  const token = localStorage.getItem("token");
+  return { Authorization: `Bearer ${token}` };
 };
 
 export default function ProductionTrackingSystem() {
@@ -106,9 +51,10 @@ export default function ProductionTrackingSystem() {
     setLoading(true);
     setError("");
     try {
-      // Replace this with your actual API call
-      const data = await mockAPI.getProductions();
-      console.log('Fetched productions:', data); // Debug log
+      const res = await axios.get(`${API_BASE}/productions`, {
+        headers: authHeaders(),
+      });
+      const data = res.data || [];
       setProductions(data);
       setFiltered(data);
     } catch (err) {
@@ -166,7 +112,7 @@ export default function ProductionTrackingSystem() {
 
   // Suggest resource allocation
   const computeSuggestions = () => {
-    const capacities = { Preparation: 5, Assembly: 4, Finishing: 3, "Quality Control": 2 };
+    const capacities = { Design: 2, Preparation: 4, Cutting: 3, Assembly: 4, Finishing: 3, "Quality Control": 2 };
     const pending = productions.filter((p) => p.status === "In Progress" || p.status === "Pending");
     const byStage = STAGES.reduce((acc, s) => ({ ...acc, [s]: pending.filter((p) => p.stage === s) }), {});
 
@@ -199,7 +145,8 @@ export default function ProductionTrackingSystem() {
 
   const updateStage = async (id, newStage) => {
     try {
-      const updated = await mockAPI.updateProduction(id, { stage: newStage });
+      const res = await axios.patch(`${API_BASE}/productions/${id}`, { stage: newStage }, { headers: authHeaders() });
+      const updated = res.data;
       setProductions((prev) => prev.map((p) => (p.id === id ? updated : p)));
     } catch (err) {
       console.error("Update stage error:", err);
