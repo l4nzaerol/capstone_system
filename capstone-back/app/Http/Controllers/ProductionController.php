@@ -73,4 +73,45 @@ class ProductionController extends Controller
 
         return response()->json(['message' => 'Production deleted']);
     }
+
+    public function analytics(Request $request) {
+        $query = Production::query();
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        }
+
+        $data = $query->get();
+
+        $kpis = [
+            'total' => $data->count(),
+            'in_progress' => $data->where('status', 'In Progress')->count(),
+            'completed' => $data->where('status', 'Completed')->count(),
+            'hold' => $data->where('status', 'Hold')->count(),
+        ];
+
+        $daily = $data->groupBy(function ($p) { return optional($p->date)->format('Y-m-d'); })
+            ->map(function ($items, $date) {
+                return [
+                    'date' => $date,
+                    'quantity' => $items->sum('quantity'),
+                ];
+            })
+            ->values()
+            ->sortBy('date')
+            ->values();
+
+        $stages = ['Preparation', 'Assembly', 'Finishing', 'Quality Control'];
+        $stageBreakdown = collect($stages)->map(function ($stage) use ($data) {
+            return [
+                'name' => $stage,
+                'value' => $data->where('stage', $stage)->count(),
+            ];
+        })->values();
+
+        return response()->json([
+            'kpis' => $kpis,
+            'daily_output' => $daily,
+            'stage_breakdown' => $stageBreakdown,
+        ]);
+    }
 }
