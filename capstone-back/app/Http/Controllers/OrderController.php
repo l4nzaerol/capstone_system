@@ -7,6 +7,7 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Production;
 
 class OrderController extends Controller
 {
@@ -39,7 +40,7 @@ class OrderController extends Controller
             'checkout_date' => now() // Set checkout date
         ]);
 
-        // Add order items and update stock
+        // Add order items, update stock, and create production jobs
         foreach ($cartItems as $item) {
             OrderItem::create([
                 'order_id' => $order->id,
@@ -51,6 +52,17 @@ class OrderController extends Controller
             // Reduce stock
             $item->product->stock -= $item->quantity;
             $item->product->save();
+
+            // Auto-create Production record for this item
+            Production::create([
+                'product_name' => $item->product->name,
+                'date' => now()->toDateString(),
+                'stage' => 'Preparation',
+                'status' => 'Pending',
+                'quantity' => $item->quantity,
+                'resources_used' => null,
+                'notes' => 'Generated from Order #' . $order->id
+            ]);
         }
 
         // Clear cart

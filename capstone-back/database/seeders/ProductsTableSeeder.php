@@ -11,7 +11,7 @@ class ProductsTableSeeder extends Seeder
     {
         Product::insert([
             [
-                'name' => 'Ipon Challenge 2025',
+                'name' => 'Dining Table',
                 'description' => '',
                 'price' => 259.00,
                 'stock' => 5,
@@ -20,7 +20,7 @@ class ProductsTableSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'name' => 'REUSABLE | FOR DREAM HOUSE |',
+                'name' => 'Wooden Chair',
                 'description' => '', 
                 'price' => 289.00,
                 'stock' => 3,
@@ -29,7 +29,7 @@ class ProductsTableSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'name' => 'REUSABLE | KEEP SAVING|',
+                'name' => 'Alkansya',
                 'description' => '',
                 'price' => 3199.00,
                 'stock' => 10,
