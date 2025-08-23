@@ -62,18 +62,22 @@ const CartTable = () => {
       const orderId = orderResponse?.data?.order?.id || orderResponse?.data?.id || null;
       const today = new Date().toISOString().slice(0, 10);
       const stageStart = "Design";
-      const payloads = cartItems.map((item) => ({
-        product_name: item.product?.name || item.name || "Product",
-        date: today,
-        stage: stageStart,
-        status: "Pending",
-        quantity: item.quantity || 0,
-        resources_used: {
-          materials: item.product?.materials || "",
-          workers: 0,
-        },
-        notes: orderId ? `From order #${orderId}` : "From checkout",
-      }));
+      const payloads = cartItems.map((item) => {
+        const name = item.product?.name || item.name || "Product";
+        const isAlkansya = /alkansya|ipon/i.test(name);
+        return {
+          product_name: name,
+          date: today,
+          stage: stageStart,
+          status: "Pending",
+          quantity: item.quantity || 0,
+          resources_used: {
+            materials: isAlkansya ? "Tin + Paint" : (item.product?.materials || ""),
+            workers: 0,
+          },
+          notes: `${orderId ? `From order #${orderId}` : "From checkout"}${isAlkansya ? " • Alkansya" : ""}`,
+        };
+      });
       await Promise.all(
         payloads.map((payload) =>
           axios.post("http://localhost:8000/api/productions", payload, { headers })

@@ -196,6 +196,25 @@ export default function ProductionTrackingSystem() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2 className="text-primary">Production Tracking — Unick Enterprises Inc.</h2>
         <div>
+          <button className="btn btn-outline-success me-2" onClick={async () => {
+            try {
+              const today = new Date().toISOString().slice(0,10);
+              const res = await axios.post(`${API_BASE}/productions`, {
+                product_name: "Alkansya",
+                date: today,
+                stage: "Design",
+                status: "Pending",
+                quantity: 1,
+                resources_used: { materials: "Tin + Paint", workers: 1 },
+                notes: "Quick-create Alkansya production"
+              }, { headers: authHeaders() });
+              setProductions((p) => [res.data, ...p]);
+            } catch (e) {
+              setError("Failed to create Alkansya production");
+            }
+          }}>
+            + Alkansya Production
+          </button>
           <button className="btn btn-outline-primary me-2" onClick={bulkExportCSV}>
             Export CSV
           </button>
